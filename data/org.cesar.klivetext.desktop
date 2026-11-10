@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=KLiveText
+GenericName=Universal Screen OCR & Data Detector
+GenericName[es]=OCR de Pantalla Universal y Detector de Datos
+Comment=Interactive Live Text with actionable data detectors for KDE Plasma 6
+Comment[es]=Texto en Vivo interactivo con detección de teléfonos, URLs, emails e IBANs
+Exec=klivetext %f
+Icon=edit-find-replace
+Terminal=false
+Categories=Utility;Office;Graphics;
+MimeType=image/png;image/jpeg;image/webp;image/avif;image/tiff;
+StartupNotify=true
+X-KDE-StartupNotify=true

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Service
+MimeType=image/png;image/jpeg;image/webp;image/avif;image/tiff;image/bmp;image/svg+xml;
+X-KDE-Protocols=file
+Actions=liveTextScan;
+
+[Desktop Action liveTextScan]
+Name=Escanear Texto en Vivo (KLiveText)
+Name[en]=Scan Live Text (KLiveText)
+Icon=edit-find-replace
+Exec=klivetext %f
