@@ -5,10 +5,15 @@
 test_klivetext.py: Suite de pruebas unitarias y de integración para KLiveText.
 """
 
+import importlib.machinery
+import importlib.util
+import json
 import sys
 import unittest
 import tempfile
 import subprocess
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -16,6 +21,17 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from datadetector import detect_entities, validate_iban
 from ocrengine import run_ocr
+
+
+def _load_launcher():
+    """Carga el lanzador (sin extensión) como módulo para probar sus piezas."""
+    spec = importlib.util.spec_from_loader(
+        "klivetext_launcher",
+        importlib.machinery.SourceFileLoader("klivetext_launcher", str(PROJECT_ROOT / "bin" / "klivetext")),
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 class TestDataDetectors(unittest.TestCase):
@@ -91,6 +107,74 @@ class TestOcrEngine(unittest.TestCase):
         for w in res["words"]:
             self.assertGreater(w["w"], 0)
             self.assertGreater(w["h"], 0)
+
+
+class TestActionChannel(unittest.TestCase):
+    """El canal de acciones local solo permite una lista blanca de comandos."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.launcher = _load_launcher()
+        cls.server = cls.launcher.ActionServer(port=1799)
+        if not cls.server.start():
+            raise unittest.SkipTest("El puerto 1799 no está disponible")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.stop()
+
+    def _post(self, payload):
+        request = urllib.request.Request(
+            "http://127.0.0.1:1799/action",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                return response.status, json.loads(response.read())
+        except urllib.error.HTTPError as error:
+            return error.code, json.loads(error.read())
+
+    def test_allowed_command_is_executed(self):
+        status, body = self._post({"cmd": "wl-copy", "args": ["klivetext probe"]})
+        self.assertEqual(status, 200)
+        self.assertTrue(body["ok"])
+
+    def test_command_outside_the_whitelist_is_rejected(self):
+        status, body = self._post({"cmd": "rm", "args": ["-rf", "/"]})
+        self.assertEqual(status, 403)
+        self.assertFalse(body["ok"])
+
+    def test_non_string_arguments_are_rejected(self):
+        status, body = self._post({"cmd": "wl-copy", "args": [123]})
+        self.assertEqual(status, 400)
+        self.assertFalse(body["ok"])
+
+    def test_malformed_payload_is_rejected(self):
+        request = urllib.request.Request(
+            "http://127.0.0.1:1799/action",
+            data=b"not json",
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                status = response.status
+        except urllib.error.HTTPError as error:
+            status = error.code
+        self.assertEqual(status, 400)
+
+    def test_unknown_endpoint_is_rejected(self):
+        request = urllib.request.Request(
+            "http://127.0.0.1:1799/other",
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                status = response.status
+        except urllib.error.HTTPError as error:
+            status = error.code
+        self.assertEqual(status, 404)
 
 
 if __name__ == "__main__":

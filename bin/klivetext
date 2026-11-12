@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 Cesar <yugurta@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-klivetext: Universal Screen OCR & Data Detector (Apple Live Text para KDE Plasma 6)
+klivetext: Universal Screen OCR & Data Detector para KDE Plasma 6 (Wayland)
 """
 
 import sys
@@ -11,6 +11,9 @@ import json
 import subprocess
 import argparse
 import atexit
+import threading
+import tempfile
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -27,6 +30,118 @@ from ocrengine import run_ocr
 DATA_PAYLOAD_PATH = Path("/dev/shm/klivetext_data.json")
 DEFAULT_CAPTURE_PATH = Path("/dev/shm/klivetext_capture.png")
 QML_FILE_PATH = LIB_DIR / "src/ui/LiveTextOverlay.qml"
+
+# ---------------------------------------------------------------------------
+# Local action channel
+#
+# The QML overlay runs under the generic `qml` runtime, which cannot spawn
+# processes on its own, so the overlay asks this tiny loopback server to run
+# one of a strictly whitelisted set of commands. It binds to 127.0.0.1 only and
+# never invokes a shell.
+# ---------------------------------------------------------------------------
+ACTION_HOST = "127.0.0.1"
+ACTION_PORT = 1742
+
+ALLOWED_COMMANDS = {
+    "wl-copy": (),
+    "kdeconnect": ("--share-text",),
+}
+
+
+class ActionHandler(BaseHTTPRequestHandler):
+    """Handles the `POST /action` requests of the QML overlay."""
+
+    def log_message(self, fmt, *args):  # noqa: D401 - silence the default logging
+        """Keeps the console clean: the actions are reported by the UI itself."""
+
+    def _reply(self, status: int, payload: dict) -> None:
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self):  # noqa: N802 - required by BaseHTTPRequestHandler
+        if self.path != "/action":
+            self._reply(404, {"ok": False, "error": "unknown endpoint"})
+            return
+
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            request = json.loads(self.rfile.read(length).decode("utf-8"))
+        except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
+            self._reply(400, {"ok": False, "error": "invalid request"})
+            return
+
+        command = request.get("cmd", "")
+        args = request.get("args", [])
+
+        if command not in ALLOWED_COMMANDS:
+            self._reply(403, {"ok": False, "error": f"command not allowed: {command}"})
+            return
+
+        if not isinstance(args, list) or not all(isinstance(arg, str) for arg in args):
+            self._reply(400, {"ok": False, "error": "invalid arguments"})
+            return
+
+        try:
+            # The payload is always passed as an argument. The output is
+            # collected in a temporary file instead of a pipe: `wl-copy` keeps
+            # running in the background to hold the clipboard selection and it
+            # would inherit an open pipe, blocking the request forever.
+            with tempfile.TemporaryFile(mode="w+") as errors:
+                process = subprocess.Popen(
+                    [command, *args],
+                    stdout=subprocess.DEVNULL,
+                    stderr=errors,
+                    text=True,
+                    start_new_session=True,
+                )
+                try:
+                    returncode = process.wait(timeout=2.0)
+                except subprocess.TimeoutExpired:
+                    # The command is still alive on purpose: it holds the
+                    # clipboard selection in the background.
+                    returncode = 0
+                    process.kill()
+
+                errors.seek(0)
+                message = errors.read().strip()
+        except (OSError, subprocess.SubprocessError) as exc:
+            self._reply(500, {"ok": False, "error": str(exc)})
+            return
+
+        if returncode != 0:
+            self._reply(500, {"ok": False, "error": message or "command failed"})
+            return
+
+        self._reply(200, {"ok": True})
+
+
+class ActionServer:
+    """Loopback HTTP server that exposes the whitelisted actions to the QML."""
+
+    def __init__(self, host: str = ACTION_HOST, port: int = ACTION_PORT) -> None:
+        self._host = host
+        self._port = port
+        self._httpd: HTTPServer | None = None
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> bool:
+        try:
+            self._httpd = HTTPServer((self._host, self._port), ActionHandler)
+        except OSError:
+            return False
+        self._thread = threading.Thread(target=self._httpd.serve_forever, daemon=True)
+        self._thread.start()
+        return True
+
+    def stop(self) -> None:
+        if self._httpd is not None:
+            self._httpd.shutdown()
+            self._httpd.server_close()
+            self._httpd = None
 
 
 def cleanup():
@@ -103,13 +218,37 @@ def main():
         print(data["full_text"])
         sys.exit(0)
 
-    # Guardar estado en memoria compartida para la UI Kirigami
+    # Guardar estado en memoria compartida para la UI
     with open(DATA_PAYLOAD_PATH, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-    # Lanzar la interfaz interactiva Kirigami QML
+    # Lanzar la interfaz interactiva QML (diseño CachyOS.UI)
     env = os.environ.copy()
     env["QML_XHR_ALLOW_FILE_READ"] = "1"
+
+    # El módulo de diseño CachyOS.UI vive en el prefijo del usuario.
+    qml_import_paths = [
+        path
+        for path in (
+            os.environ.get("QML2_IMPORT_PATH", ""),
+            str(Path.home() / ".local/lib/qt6/qml"),
+            "/usr/lib/qt6/qml",
+        )
+        if path
+    ]
+    env["QML2_IMPORT_PATH"] = ":".join(dict.fromkeys(qml_import_paths))
+
+    # Estilo de controles de Plasma, como el resto del ecosistema CachyOS.UI.
+    if not env.get("QT_QUICK_CONTROLS_STYLE"):
+        env["QT_QUICK_CONTROLS_STYLE"] = "org.kde.desktop"
+
+    # Canal de acciones para la interfaz (copiar, enviar al móvil).
+    server = ActionServer()
+    if not server.start():
+        print("⚠️  No se pudo iniciar el canal de acciones local.", file=sys.stderr)
+    else:
+        atexit.register(server.stop)
+
     qml_bin = shutil_which_qml()
 
     cmd = [qml_bin, str(QML_FILE_PATH)]
@@ -118,6 +257,8 @@ def main():
     except Exception as exc:
         print(f"Error al abrir la interfaz: {exc}", file=sys.stderr)
         sys.exit(1)
+    finally:
+        server.stop()
 
 
 def shutil_which_qml() -> str:

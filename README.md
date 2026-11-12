@@ -1,79 +1,93 @@
-# KLiveText 🔍✨
+# KLiveText 🔍
 
-> **Universal Screen OCR & Data Detector para KDE Plasma 6 sobre Wayland.**
-> *El equivalente de código abierto a Apple Live Text (Texto en Vivo) y Data Detectors de macOS para Linux.*
+> **OCR universal de pantalla y detector de datos para KDE Plasma 6 sobre Wayland en CachyOS Linux.**
 
-`klivetext` permite convertir cualquier imagen, captura de pantalla o fotograma en una superficie de texto interactiva con detección automática de entidades accionables con un solo clic.
+KLiveText captura una región de la pantalla, la reconoce con **OCR local** y
+ofrece el texto de forma interactiva: cada palabra detectada es copiable con
+un clic y los datos detectados (URL, correo, teléfono, IBAN, fecha) se
+convierten en acciones de un clic.
 
 ---
 
 ## ✨ Características
 
-- 🎯 **OCR Estructurado con Cajas Delimitadoras:** Utiliza Tesseract OCR en modo TSV para extraer palabras y líneas conservando sus coordenadas y dimensiones geométricas exactas.
-- ⚡ **Detectores de Datos Accionables (*Data Detectors*):**
-  - 📞 **Teléfonos:** Detecta prefijos internacionales y locales, ofreciendo un botón para llamar mediante KDE Connect o KPhone.
-  - 🔗 **Enlaces Web / URLs:** Detecta dominios y URLs, permitiendo abrirlos en el navegador con un solo clic.
-  - ✉️ **Correos Electrónicos:** Detecta direcciones de email y abre el cliente de correo predeterminado (`mailto:`).
-  - 🏦 **Cuentas IBAN:** Valida matemáticamente el checksum mod-97 de cuentas bancarias y las formatea limpiamente.
-  - 📅 **Fechas / Citas:** Identifica fechas textuales y numéricas para agregar a Recordatorios o Calendario.
-- 📱 **Integración con KDE Connect:** Botón directo en la barra superior para copiar y transferir el texto capturado a tu teléfono móvil sincronizado.
-- 🖼️ **Superficie Interactiva:** Haz clic en cualquier palabra resaltada para copiarla instantáneamente al portapapeles de Wayland (`wl-copy`).
-- ⚡ **Sin fricción:** Captura directamente en RAM (`/dev/shm`) mediante Spectacle, sin dejar archivos residuales en disco.
+### Diseño Golden Gate / Liquid Glass (`CachyOS.UI`)
+
+- **Ventana `CachyWindow`**: marco translúcido con el desenfoque de KWin, cabecera de `44 px` con el divisor duro de `1 px`, radios de `20 px` y margen perimetral de `18 px`.
+- **Proporción canónica**: `880 × 640` (`CachyTheme.windowWidthSettings` / `windowHeightSettings`), la misma que el resto del ecosistema; la captura se escala para caber en su interior.
+- **Acciones en la cabecera**: *Copiar Todo* (`Ctrl+C`) y *Enviar al Móvil* a la derecha; el resumen de la captura («N palabras • M entidades») en una píldora de cristal a la izquierda.
+- **Detectores de datos** como píldoras de cristal en la parte inferior, desplazables en horizontal.
+- **Cero colores literales** en el cromo: todo sale de `CachyTheme`, con adaptación clara/oscura.
+
+### OCR y detección
+
+- **OCR local y privado** con `tesseract` (sin ningún servicio en la nube).
+- **Cajas delimitadoras interactivas**: al pasar el ratón por encima de una palabra se resalta y basta un clic para copiarla.
+- **Detectores de datos**: URL, correo electrónico, teléfono, IBAN (con validación) y fecha.
+- **Envío al móvil** por KDE Connect (`kdeconnect-cli --share-text`).
+
+### Canal de acciones local
+
+La interfaz QML se ejecuta bajo el runtime genérico de Qt, que no puede lanzar
+procesos por sí mismo. El lanzador levanta un pequeño servidor HTTP en
+`127.0.0.1:1742` que ejecuta **solo** una lista blanca de comandos
+(`wl-copy`, `kdeconnect --share-text`), sin invocar nunca un shell.
 
 ---
 
-## 🚀 Instalación Rápida
+## 🚀 Uso
 
 ```bash
-git clone https://github.com/cesarconte/klivetext.git
-cd klivetext
+klivetext                 # captura la región seleccionada y abre la interfaz
+klivetext imagen.png      # analiza una imagen concreta
+klivetext -c imagen.png   # solo copia el texto y termina (sin interfaz)
+```
+
+| Atajo | Acción |
+| :--- | :--- |
+| `Ctrl+C` | Copiar todo el texto reconocido |
+| `Escape` | Cerrar la interfaz |
+| Clic sobre una palabra | Copiar esa palabra |
+
+---
+
+## 🛠️ Compilación e Instalación
+
+```bash
+# 1. El sistema de diseño (módulo QML + helper de traducciones) debe estar instalado
+cd ../cachyos-ui
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/
+cmake --build build -j"$(nproc)"
+DESTDIR=$HOME/.local cmake --install build
+
+# 2. La aplicación
+cd ../klivetext
 ./install.sh
 ```
 
-O si prefieres instalarlo mediante paquete del sistema en Arch / CachyOS:
+El lanzador necesita el módulo `CachyOS.UI` en `QML2_IMPORT_PATH`; el
+lanzador lo añade automáticamente (`~/.local/lib/qt6/qml`).
 
-```bash
-makepkg -si
-```
+### Dependencias del sistema
 
----
-
-## ⌨️ Atajos y Uso
-
-- <kbd>Meta</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>: Dispara la selección de región en pantalla e inicia KLiveText de inmediato.
-- **En Dolphin:** Haz clic derecho sobre cualquier imagen (`.png`, `.jpg`, `.webp`, `.avif`, `.heic`) y selecciona *"Escanear Texto en Vivo (KLiveText)"*.
-- **En Terminal:**
-  ```bash
-  # Captura de pantalla interactiva
-  klivetext
-
-  # Analizar una imagen existente
-  klivetext captura.png
-
-  # Modo silencioso (solo copia el texto al portapapeles y lo imprime en terminal)
-  klivetext --copy-only captura.png
-  ```
+`spectacle` (captura), `tesseract` (OCR), `wl-copy` (portapapeles),
+`kdeconnect-cli` (envío al móvil) y las bibliotecas de KDE Frameworks 6.
 
 ---
 
-## 🧪 Pruebas Automatizadas
-
-El repositorio incluye una suite completa de pruebas unitarias y de integración:
+## 🧪 Tests
 
 ```bash
-python3 ./tests/test_klivetext.py
+cd klivetext
+python3 -m unittest discover -s tests -v
 ```
 
----
-
-## 🗑️ Desinstalación
-
-```bash
-./uninstall.sh
-```
+La suite cubre los detectores de datos, la validación de IBAN, el motor de OCR
+y el **canal de acciones** (comando permitido, comando fuera de la lista
+blanca, argumentos inválidos, carga malformada y endpoint desconocido).
 
 ---
 
 ## 📄 Licencia
 
-GPLv3. Desarrollado para KDE Plasma 6 sobre Wayland y CachyOS Linux.
+GPLv3. Desarrollado por César Conte.
