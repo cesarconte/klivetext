@@ -44,8 +44,30 @@ ACTION_PORT = 1742
 
 ALLOWED_COMMANDS = {
     "wl-copy": (),
-    "kdeconnect": ("--share-text",),
+    "kdeconnect-cli": ("--share-text",),
 }
+
+# Commands that need a KDE Connect device and accept one through -d / -n.
+DEVICE_COMMANDS = {"kdeconnect-cli"}
+
+
+def resolve_default_device() -> str | None:
+    """Returns the identifier of the first reachable KDE Connect device."""
+    try:
+        result = subprocess.run(
+            ["kdeconnect-cli", "--list-available", "--id-only"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+    for line in result.stdout.splitlines():
+        candidate = line.strip()
+        if candidate:
+            return candidate
+    return None
 
 
 class ActionHandler(BaseHTTPRequestHandler):
@@ -91,8 +113,19 @@ class ActionHandler(BaseHTTPRequestHandler):
             # running in the background to hold the clipboard selection and it
             # would inherit an open pipe, blocking the request forever.
             with tempfile.TemporaryFile(mode="w+") as errors:
+                invocation = [command, *args]
+
+                # KDE Connect needs an explicit device when the caller does not
+                # provide one: the first reachable device is used.
+                if command in DEVICE_COMMANDS and not any(a in ("-d", "-n", "--device", "--name") for a in args):
+                    device = resolve_default_device()
+                    if device is None:
+                        self._reply(503, {"ok": False, "error": "No hay ningún dispositivo KDE Connect disponible"})
+                        return
+                    invocation = [command, "-d", device, *args]
+
                 process = subprocess.Popen(
-                    [command, *args],
+                    invocation,
                     stdout=subprocess.DEVNULL,
                     stderr=errors,
                     text=True,

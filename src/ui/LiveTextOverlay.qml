@@ -131,7 +131,7 @@ CachyWindow {
             showToast(CachyI18n.i18n("No hay texto que enviar"));
             return;
         }
-        runCommand("kdeconnect", ["--share-text", text], function(ok, message) {
+        runCommand("kdeconnect-cli", ["--share-text", text], function(ok, message) {
             if (ok) {
                 showToast(CachyI18n.i18n("Texto enviado por KDE Connect"));
             } else {
@@ -280,12 +280,16 @@ CachyWindow {
                                     width: Math.max(4, modelData.w * scaleX)
                                     height: Math.max(4, modelData.h * scaleY)
 
+                                    // The recognised words are always visible:
+                                    // the OCR result must be legible in the
+                                    // interface, not only discoverable by
+                                    // hovering over the image.
                                     color: wordHover.containsMouse
-                                        ? CachyTheme.withAlpha(CachyTheme.accentColor, 0.30)
-                                        : "transparent"
+                                        ? CachyTheme.withAlpha(CachyTheme.accentColor, 0.28)
+                                        : CachyTheme.withAlpha(CachyTheme.accentColor, 0.10)
                                     border.color: wordHover.containsMouse
                                         ? CachyTheme.accentColor
-                                        : "transparent"
+                                        : CachyTheme.withAlpha(CachyTheme.accentColor, 0.40)
                                     border.width: 1
                                     radius: 2
 

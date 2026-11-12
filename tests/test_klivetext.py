@@ -163,6 +163,51 @@ class TestActionChannel(unittest.TestCase):
             status = error.code
         self.assertEqual(status, 400)
 
+    def test_kdeconnect_resolves_the_default_device(self):
+        """KDE Connect exige un dispositivo: se resuelve el primero accesible."""
+        calls = []
+        original_popen = self.launcher.subprocess.Popen
+        original_resolver = self.launcher.resolve_default_device
+
+        class FakeProcess:
+            returncode = 0
+
+            def wait(self, timeout=None):
+                return 0
+
+            def kill(self):
+                pass
+
+        def fake_popen(command, **kwargs):
+            calls.append(command)
+            return FakeProcess()
+
+        self.launcher.subprocess.Popen = fake_popen
+        self.launcher.resolve_default_device = lambda: "device-id-123"
+        try:
+            status, body = self._post({"cmd": "kdeconnect-cli", "args": ["--share-text", "hola"]})
+        finally:
+            self.launcher.subprocess.Popen = original_popen
+            self.launcher.resolve_default_device = original_resolver
+
+        self.assertEqual(status, 200)
+        self.assertTrue(body["ok"])
+        self.assertEqual(
+            calls[0],
+            ["kdeconnect-cli", "-d", "device-id-123", "--share-text", "hola"],
+        )
+
+    def test_missing_device_is_reported(self):
+        original_resolver = self.launcher.resolve_default_device
+        self.launcher.resolve_default_device = lambda: None
+        try:
+            status, body = self._post({"cmd": "kdeconnect-cli", "args": ["--share-text", "hola"]})
+        finally:
+            self.launcher.resolve_default_device = original_resolver
+
+        self.assertEqual(status, 503)
+        self.assertFalse(body["ok"])
+
     def test_unknown_endpoint_is_rejected(self):
         request = urllib.request.Request(
             "http://127.0.0.1:1799/other",
