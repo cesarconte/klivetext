@@ -18,8 +18,10 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = SCRIPT_DIR.parent
-if (PROJECT_DIR / "src").exists():
+if (PROJECT_DIR / "src" / "ocrengine.py").exists():
     LIB_DIR = PROJECT_DIR
+elif (PROJECT_DIR / "share/klivetext/src").exists():
+    LIB_DIR = PROJECT_DIR / "share/klivetext"
 else:
     LIB_DIR = Path.home() / ".local/share/klivetext"
 

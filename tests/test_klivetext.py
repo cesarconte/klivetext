@@ -79,11 +79,25 @@ class TestOcrEngine(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.image_path = Path(self.temp_dir.name) / "test_ocr.png"
-        # Crear imagen con texto nítido usando ImageMagick
+        # Crear imagen con texto nítido usando ImageMagick y una fuente real resuelta vía fontconfig
+        font_args = []
+        try:
+            font_probe = subprocess.run(
+                ["fc-match", "-f", "%{file}", "sans-serif"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            font_path = font_probe.stdout.strip()
+            if font_probe.returncode == 0 and font_path and Path(font_path).is_file():
+                font_args = ["-font", font_path]
+        except OSError:
+            pass
         cmd = [
             "magick",
             "-size", "600x120",
             "xc:white",
+            *font_args,
             "-pointsize", "28",
             "-fill", "black",
             "-annotate", "+20+60", "Hola Mundo Contacto: cesar@example.com",
