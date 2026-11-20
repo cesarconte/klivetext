@@ -6,13 +6,18 @@
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BIN_DIR="${HOME}/.local/bin"
-SHARE_DIR="${HOME}/.local/share/klivetext"
-APPS_DIR="${HOME}/.local/share/applications"
-SERVICEMENUS_DIR="${HOME}/.local/share/kio/servicemenus"
-TESS_DIR="${HOME}/.local/share/tessdata"
+BIN_DIR="/usr/bin"
+SHARE_DIR="/usr/share/klivetext"
+APPS_DIR="/usr/share/applications"
+SERVICEMENUS_DIR="/usr/share/kio/servicemenus"
+TESS_DIR="/usr/share/tessdata"
 
-echo "==> Instalando KLiveText (Universal Screen OCR & Data Detector)..."
+SUDO=""
+if [ "$EUID" -ne 0 ]; then
+    SUDO="sudo -n"
+fi
+
+echo "==> Instalando KLiveText (Universal Screen OCR & Data Detector) en /usr..."
 
 # 1. Comprobar dependencias
 MISSING_DEPS=()
@@ -26,28 +31,28 @@ if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
     echo "⚠️  Faltan las siguientes dependencias: ${MISSING_DEPS[*]}"
     if command -v pacman >/dev/null 2>&1; then
         echo "--> Puedes instalarlas en CachyOS/Arch con:"
-        echo "    sudo pacman -S --needed spectacle tesseract wl-clipboard imagemagick qt6-declarative kirigami"
+        echo "    sudo pacman -S --needed spectacle tesseract wl-clipboard imagemagick qt6-declarative"
     fi
 fi
 
 # 2. Instalar bibliotecas y componentes UI
-mkdir -p "${SHARE_DIR}/src/ui"
-cp -r "${SCRIPT_DIR}/src/"* "${SHARE_DIR}/src/"
+$SUDO mkdir -p "${SHARE_DIR}/src/ui"
+$SUDO cp -r "${SCRIPT_DIR}/src/"* "${SHARE_DIR}/src/"
 echo "  ✓ Módulos de detección y UI instalados en ${SHARE_DIR}"
 
 # 3. Instalar ejecutable
-mkdir -p "$BIN_DIR"
-install -m 755 "${SCRIPT_DIR}/bin/klivetext" "${BIN_DIR}/klivetext"
+$SUDO mkdir -p "$BIN_DIR"
+$SUDO install -m 755 "${SCRIPT_DIR}/bin/klivetext" "${BIN_DIR}/klivetext"
 echo "  ✓ Binario instalado en ${BIN_DIR}/klivetext"
 
 # 4. Instalar menú de servicio para Dolphin
-mkdir -p "$SERVICEMENUS_DIR"
-install -m 644 "${SCRIPT_DIR}/data/klivetext_servicemenu.desktop" "${SERVICEMENUS_DIR}/org.cesar.klivetext.desktop"
+$SUDO mkdir -p "$SERVICEMENUS_DIR"
+$SUDO install -m 644 "${SCRIPT_DIR}/data/klivetext_servicemenu.desktop" "${SERVICEMENUS_DIR}/org.cesar.klivetext.desktop"
 echo "  ✓ Menú contextual de Dolphin instalado en ${SERVICEMENUS_DIR}/org.cesar.klivetext.desktop"
 
 # 5. Instalar lanzador de aplicaciones
-mkdir -p "$APPS_DIR"
-install -m 644 "${SCRIPT_DIR}/data/org.cesar.klivetext.desktop" "${APPS_DIR}/org.cesar.klivetext.desktop"
+$SUDO mkdir -p "$APPS_DIR"
+$SUDO install -m 644 "${SCRIPT_DIR}/data/org.cesar.klivetext.desktop" "${APPS_DIR}/org.cesar.klivetext.desktop"
 echo "  ✓ Lanzador registrado en ${APPS_DIR}/org.cesar.klivetext.desktop"
 
 # 6. Configurar modelos de lenguaje de Tesseract (Español + Inglés + configs)

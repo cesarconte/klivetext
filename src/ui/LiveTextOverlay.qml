@@ -14,10 +14,8 @@
 */
 
 import QtQuick
-import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 import QtQuick.Window
-import org.kde.kirigami as Kirigami
 import CachyOS.UI
 
 CachyWindow {
@@ -183,20 +181,17 @@ CachyWindow {
                 anchors.rightMargin: 9
                 spacing: 7
 
-                Kirigami.Icon {
-                    source: "edit-find-replace"
-                    Layout.preferredWidth: 15
-                    Layout.preferredHeight: 15
+                CachyIcon {
+                    name: "edit-find-replace"
+                    size: 15
                     color: CachyTheme.textSecondary
                 }
 
-                Text {
+                CachyLabel {
                     Layout.fillWidth: true
                     Layout.minimumWidth: 0
                     Layout.maximumWidth: 240
-                    text: CachyI18n.i18n("%1 palabras • %2 entidades")
-                            .arg(dataModel.words.length)
-                            .arg(dataModel.entities.length)
+                    text: CachyI18n.i18n("%1 palabras • %2 entidades", dataModel.words.length, dataModel.entities.length)
                     font.pixelSize: 11
                     color: CachyTheme.textSecondary
                     elide: Text.ElideRight
@@ -301,9 +296,11 @@ CachyWindow {
                                         onClicked: root.copyToClipboard(modelData.text)
                                     }
 
-                                    QQC2.ToolTip.visible: wordHover.containsMouse
-                                    QQC2.ToolTip.text: modelData.text + " " + CachyI18n.i18n("(clic para copiar)")
-                                    QQC2.ToolTip.delay: 200
+                                    CachyTooltip {
+                                        visible: wordHover.containsMouse
+                                        text: modelData.text + " " + CachyI18n.i18n("(clic para copiar)")
+                                        delay: 200
+                                    }
                                 }
                             }
                         }
@@ -388,14 +385,13 @@ CachyWindow {
                                     anchors.centerIn: parent
                                     spacing: 6
 
-                                    Kirigami.Icon {
-                                        source: entityDelegate.modelData.icon || "dialog-information"
-                                        Layout.preferredWidth: 15
-                                        Layout.preferredHeight: 15
+                                    CachyIcon {
+                                        name: entityDelegate.modelData.icon || "dialog-information"
+                                        size: 15
                                         color: CachyTheme.textSecondary
                                     }
 
-                                    Text {
+                                    CachyLabel {
                                         Layout.maximumWidth: 220
                                         text: entityDelegate.modelData.label
                                         font.pixelSize: 12
@@ -438,14 +434,13 @@ CachyWindow {
                 anchors.centerIn: parent
                 spacing: 8
 
-                Kirigami.Icon {
-                    source: "dialog-ok"
-                    Layout.preferredWidth: 16
-                    Layout.preferredHeight: 16
+                CachyIcon {
+                    name: "dialog-ok"
+                    size: 16
                     color: CachyTheme.accentColor
                 }
 
-                Text {
+                CachyLabel {
                     id: toastLabel
                     color: CachyTheme.textPrimary
                     font.pixelSize: 12

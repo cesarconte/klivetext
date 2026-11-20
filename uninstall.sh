@@ -5,17 +5,22 @@
 
 set -eo pipefail
 
-BIN_DIR="${HOME}/.local/bin"
-SHARE_DIR="${HOME}/.local/share/klivetext"
-APPS_DIR="${HOME}/.local/share/applications"
-SERVICEMENUS_DIR="${HOME}/.local/share/kio/servicemenus"
+BIN_DIR="/usr/bin"
+SHARE_DIR="/usr/share/klivetext"
+APPS_DIR="/usr/share/applications"
+SERVICEMENUS_DIR="/usr/share/kio/servicemenus"
 
-echo "==> Desinstalando KLiveText..."
+SUDO=""
+if [ "$EUID" -ne 0 ]; then
+    SUDO="sudo -n"
+fi
 
-rm -f "${BIN_DIR}/klivetext"
-rm -rf "${SHARE_DIR}"
-rm -f "${SERVICEMENUS_DIR}/org.cesar.klivetext.desktop"
-rm -f "${APPS_DIR}/org.cesar.klivetext.desktop"
+echo "==> Desinstalando KLiveText de /usr..."
+
+$SUDO rm -f "${BIN_DIR}/klivetext"
+$SUDO rm -rf "${SHARE_DIR}"
+$SUDO rm -f "${SERVICEMENUS_DIR}/org.cesar.klivetext.desktop"
+$SUDO rm -f "${APPS_DIR}/org.cesar.klivetext.desktop"
 
 if command -v kbuildsycoca6 >/dev/null 2>&1; then
     kbuildsycoca6 --noincremental >/dev/null 2>&1 || true

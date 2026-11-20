@@ -23,7 +23,7 @@ if (PROJECT_DIR / "src" / "ocrengine.py").exists():
 elif (PROJECT_DIR / "share/klivetext/src").exists():
     LIB_DIR = PROJECT_DIR / "share/klivetext"
 else:
-    LIB_DIR = Path.home() / ".local/share/klivetext"
+    LIB_DIR = Path("/usr/share/klivetext")
 
 sys.path.insert(0, str(LIB_DIR / "src"))
 
@@ -260,13 +260,14 @@ def main():
     # Lanzar la interfaz interactiva QML (diseño CachyOS.UI)
     env = os.environ.copy()
     env["QML_XHR_ALLOW_FILE_READ"] = "1"
+    if "QT_LOGGING_RULES" not in env:
+        env["QT_LOGGING_RULES"] = "kf.i18n.warning=false"
 
-    # El módulo de diseño CachyOS.UI vive en el prefijo del usuario.
+    # El módulo de diseño CachyOS.UI está instalado en /usr/lib/qt6/qml.
     qml_import_paths = [
         path
         for path in (
             os.environ.get("QML2_IMPORT_PATH", ""),
-            str(Path.home() / ".local/lib/qt6/qml"),
             "/usr/lib/qt6/qml",
         )
         if path
