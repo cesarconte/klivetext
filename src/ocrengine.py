@@ -13,7 +13,9 @@ from typing import Dict, Any, List
 
 from datadetector import detect_entities
 
-TESSDATA_DIR = Path.home() / ".local/share/tessdata"
+_SYSTEM_TESSDATA = Path("/usr/share/tessdata")
+_USER_TESSDATA = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "tessdata"
+TESSDATA_DIR = _SYSTEM_TESSDATA if _SYSTEM_TESSDATA.is_dir() else _USER_TESSDATA
 
 
 def get_image_dimensions(image_path: Path) -> tuple[int, int]:

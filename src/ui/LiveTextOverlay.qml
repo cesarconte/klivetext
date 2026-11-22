@@ -5,13 +5,16 @@
     KLiveText — Texto en vivo (OCR universal y detector de datos).
 
     Diseño Golden Gate / Liquid Glass (CachyOS.UI):
-      * ventana `CachyWindow` con marco translúcido, cabecera de 44 px con el
-        divisor duro de 1 px y radio de 20 px;
-      * las acciones (copiar, enviar al móvil) viven en la cabecera;
-      * el resumen de la captura se muestra en una píldora de cristal a la
-        izquierda de la cabecera;
-      * toda la paleta, los radios y los espaciados salen de `CachyTheme`.
+      * Ventana `CachyWindow` con marco translúcido, esquinas de 20 px, borde
+        especular de 1 px y cabecera continua sin divisor duro (`showTitleBarDivider: false`).
+      * Acciones rápidas agrupadas en cápsula `CachyToolbarGroup` (copiar todo, traducir, enviar al móvil).
+      * Botón distintivo flotante de Texto en Vivo (Live Text badge) en la esquina inferior derecha.
+      * Resumen de la captura en píldora de cristal a la izquierda de la cabecera.
+      * Cajas de selección interactivas sobre la imagen y chips de detectores de datos.
+      * Paleta y tokens estandarizados mediante `CachyPalette` y `CachyTheme`.
 */
+
+pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
@@ -23,20 +26,18 @@ CachyWindow {
 
     title: CachyI18n.i18n("KLiveText • Texto en Vivo")
 
-    // Canonical window metrics of the design system: the captured region is
-    // scaled to fit inside, so the window keeps the proportion of the rest of
-    // the ecosystem instead of stretching with the screenshot.
     width: CachyTheme.windowWidthSettings
     height: CachyTheme.windowHeightSettings
     minimumWidth: 640
     minimumHeight: 480
 
     showTrafficLights: true
-    showTitleBarDivider: true          // divisor duro de 1 px
+    showTitle: false
+    showTitleBarDivider: false         // Barra continua Liquid Glass sin divisor duro
     showWindowFrame: true              // Liquid Glass: blur KWin + rim especular
     resizable: true
     cornerRadius: CachyTheme.radiusWindow
-    contentPadded: true                // margen perimetral de 18 px
+    contentPadded: true                // Margen perimetral de 18 px
 
     // Modelo de datos cargado desde /dev/shm/klivetext_data.json
     QtObject {
@@ -170,9 +171,9 @@ CachyWindow {
             height: 28
             implicitWidth: statsRow.implicitWidth + 18
             radius: 14
-            color: CachyTheme.surfacePill
+            color: CachyPalette.surfacePill
             border.width: 1
-            border.color: CachyTheme.specularBorder
+            border.color: CachyPalette.specularBorder
 
             RowLayout {
                 id: statsRow
@@ -182,9 +183,9 @@ CachyWindow {
                 spacing: 7
 
                 CachyIcon {
-                    name: "edit-find-replace"
+                    name: "format-text"
                     size: 15
-                    color: CachyTheme.textSecondary
+                    color: CachyTheme.accentColor
                 }
 
                 CachyLabel {
@@ -193,7 +194,7 @@ CachyWindow {
                     Layout.maximumWidth: 240
                     text: CachyI18n.i18n("%1 palabras • %2 entidades", dataModel.words.length, dataModel.entities.length)
                     font.pixelSize: 11
-                    color: CachyTheme.textSecondary
+                    color: CachyPalette.textSecondary
                     elide: Text.ElideRight
                 }
             }
@@ -201,20 +202,35 @@ CachyWindow {
     ]
 
     // =========================================================================
-    // CABECERA — DERECHA: acciones
+    // CABECERA — DERECHA: acciones en cápsula Golden Gate
     // =========================================================================
     headerActions: [
-        RowLayout {
+        CachyToolbarGroup {
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 6
 
             CachyToolbarButton {
+                pillStyle: false
+                iconName: "copy"
                 text: CachyI18n.i18n("Copiar Todo")
                 tooltipText: CachyI18n.i18n("Copiar todo el texto reconocido (Ctrl+C)")
                 onClicked: root.copyToClipboard(dataModel.fullText)
             }
 
             CachyToolbarButton {
+                pillStyle: false
+                iconName: "globe"
+                text: CachyI18n.i18n("Traducir")
+                tooltipText: CachyI18n.i18n("Traducir el texto reconocido")
+                visible: dataModel.fullText.length > 0
+                onClicked: {
+                    var encoded = encodeURIComponent(dataModel.fullText);
+                    Qt.openUrlExternally("https://translate.google.com/?text=" + encoded);
+                }
+            }
+
+            CachyToolbarButton {
+                pillStyle: false
+                iconName: "share"
                 text: CachyI18n.i18n("Enviar al Móvil")
                 tooltipText: CachyI18n.i18n("Enviar el texto al teléfono por KDE Connect")
                 visible: dataModel.fullText.length > 0
@@ -232,7 +248,7 @@ CachyWindow {
             spacing: CachyTheme.spacingMedium
 
             // -----------------------------------------------------------------
-            // Vista de la captura con las cajas delimitadoras interactivas
+            // Vista de la captura con cajas delimitadoras interactivas
             // -----------------------------------------------------------------
             Item {
                 id: imageViewport
@@ -275,10 +291,6 @@ CachyWindow {
                                     width: Math.max(4, modelData.w * scaleX)
                                     height: Math.max(4, modelData.h * scaleY)
 
-                                    // The recognised words are always visible:
-                                    // the OCR result must be legible in the
-                                    // interface, not only discoverable by
-                                    // hovering over the image.
                                     color: wordHover.containsMouse
                                         ? CachyTheme.withAlpha(CachyTheme.accentColor, 0.28)
                                         : CachyTheme.withAlpha(CachyTheme.accentColor, 0.10)
@@ -299,9 +311,55 @@ CachyWindow {
                                     CachyTooltip {
                                         visible: wordHover.containsMouse
                                         text: modelData.text + " " + CachyI18n.i18n("(clic para copiar)")
-                                        delay: 200
+                                        delay: 450
                                     }
                                 }
+                            }
+                        }
+
+                        // Botón flotante distintivo de Live Text (macOS Golden Gate signature badge)
+                        Rectangle {
+                            id: liveTextBadge
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            anchors.margins: 14
+                            width: 34
+                            height: 34
+                            radius: 17
+                            color: badgeTap.pressed
+                                ? CachyPalette.pressedOverlay
+                                : (badgeHover.hovered ? CachyPalette.cardBackgroundHover : CachyPalette.surfacePill)
+                            border.width: 1
+                            border.color: CachyPalette.specularBorder
+                            scale: badgeTap.pressed ? 0.92 : (badgeHover.hovered ? 1.06 : 1.0)
+
+                            Behavior on scale {
+                                NumberAnimation { duration: CachyTheme.animFast; easing.type: Easing.OutBack }
+                            }
+                            Behavior on color {
+                                ColorAnimation { duration: CachyTheme.animFast }
+                            }
+
+                            CachyIcon {
+                                anchors.centerIn: parent
+                                name: "format-text"
+                                size: 16
+                                color: CachyTheme.accentColor
+                            }
+
+                            HoverHandler {
+                                id: badgeHover
+                                cursorShape: Qt.PointingHandCursor
+                            }
+                            TapHandler {
+                                id: badgeTap
+                                onTapped: root.copyToClipboard(dataModel.fullText)
+                            }
+
+                            CachyTooltip {
+                                visible: badgeHover.hovered
+                                text: CachyI18n.i18n("Texto en Vivo: clic para copiar todo (%1 palabras)", dataModel.words.length)
+                                delay: 450
                             }
                         }
                     }
@@ -317,9 +375,9 @@ CachyWindow {
                 Layout.preferredHeight: dataModel.entities.length > 0 ? 44 : 0
                 visible: dataModel.entities.length > 0
                 radius: CachyTheme.radiusMedium
-                color: CachyTheme.cardBackground
+                color: CachyPalette.cardBackground
                 border.width: 1
-                border.color: CachyTheme.specularBorder
+                border.color: CachyPalette.specularBorder
 
                 Behavior on Layout.preferredHeight {
                     NumberAnimation { duration: CachyTheme.animFast }
@@ -353,11 +411,11 @@ CachyWindow {
                                 radius: 16
                                 color: entityHover.hovered
                                     ? CachyTheme.withAlpha(CachyTheme.accentColor, 0.18)
-                                    : CachyTheme.surfacePill
+                                    : CachyPalette.surfacePill
                                 border.width: 1
                                 border.color: entityHover.hovered
                                     ? CachyTheme.accentColor
-                                    : CachyTheme.specularBorder
+                                    : CachyPalette.specularBorder
 
                                 Behavior on color {
                                     ColorAnimation { duration: CachyTheme.animFast }
@@ -386,9 +444,9 @@ CachyWindow {
                                     spacing: 6
 
                                     CachyIcon {
-                                        name: entityDelegate.modelData.icon || "dialog-information"
+                                        name: entityDelegate.modelData.icon || "info"
                                         size: 15
-                                        color: CachyTheme.textSecondary
+                                        color: CachyPalette.textSecondary
                                     }
 
                                     CachyLabel {
@@ -396,7 +454,7 @@ CachyWindow {
                                         text: entityDelegate.modelData.label
                                         font.pixelSize: 12
                                         font.weight: Font.DemiBold
-                                        color: CachyTheme.textPrimary
+                                        color: CachyPalette.text
                                         elide: Text.ElideRight
                                     }
                                 }
@@ -420,9 +478,9 @@ CachyWindow {
             width: toastLabel.implicitWidth + 36
             height: 38
             radius: 19
-            color: CachyTheme.sheetBackground
+            color: CachyPalette.sheetBackground
             border.width: 1
-            border.color: CachyTheme.specularBorder
+            border.color: CachyPalette.specularBorder
             opacity: 0.0
             z: 5
 
@@ -435,14 +493,14 @@ CachyWindow {
                 spacing: 8
 
                 CachyIcon {
-                    name: "dialog-ok"
+                    name: "check"
                     size: 16
                     color: CachyTheme.accentColor
                 }
 
                 CachyLabel {
                     id: toastLabel
-                    color: CachyTheme.textPrimary
+                    color: CachyPalette.text
                     font.pixelSize: 12
                     font.weight: Font.DemiBold
                 }

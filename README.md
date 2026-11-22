@@ -56,9 +56,9 @@ klivetext -c imagen.png   # solo copia el texto y termina (sin interfaz)
 ```bash
 # 1. El sistema de diseño (módulo QML + helper de traducciones) debe estar instalado
 cd ../cachyos-ui
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
 cmake --build build -j"$(nproc)"
-DESTDIR=$HOME/.local cmake --install build
+sudo -n cmake --install build --prefix /usr
 
 # 2. La aplicación
 cd ../klivetext
@@ -66,7 +66,7 @@ cd ../klivetext
 ```
 
 El lanzador necesita el módulo `CachyOS.UI` en `QML2_IMPORT_PATH`; el
-lanzador lo añade automáticamente (`~/.local/lib/qt6/qml`).
+módulo reside en `/usr/lib/qt6/qml`.
 
 ### Dependencias del sistema
 
